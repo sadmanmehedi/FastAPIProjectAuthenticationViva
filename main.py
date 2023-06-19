@@ -50,3 +50,14 @@ def get_one_post(id: int):
             return{
                 "data":post
             }
+        
+
+#4 Post a blog Post[A handler for creating a Post]
+@app.post("/posts",tags=["posts"])
+def add_post(post:PostSchema):
+    post.id=len(posts)+1
+    posts.append(post.dict())
+    return{
+        "info":"Post Added!"
+    }
+  
