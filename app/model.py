@@ -12,3 +12,28 @@ class PostSchema(BaseModel):
 
             }
         }
+
+
+class UserSchema(BaseModel):
+    fullname:str=Field(default=None)
+    email:EmailStr=Field(default=None)
+    password:str=Field(default=None)
+    class Config:
+        the_schema={
+            "user_demo":{
+                "name":"Bek",
+                "email":"help@bekbrace.com",
+                "password":"123"
+            }
+        }
+
+class UserLoginSchema(BaseModel):
+    email:EmailStr=Field(default=None)
+    password:str=Field(default=None)
+    class Config:
+        the_schema={
+            "user_demo":{
+                "email":"help@bekbrace.com",
+                "password":"123"
+            }
+        }

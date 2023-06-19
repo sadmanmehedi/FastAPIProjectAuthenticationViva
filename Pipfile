@@ -4,8 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-fastapi = "===0.70.0"
-uvicorn = "===0.15.0"
+fastapi = "==0.70.0"
+uvicorn = "==0.15.0"
+pyjwt = "==1.7.1"
+python-decouple = "==3.3"
+pydantic = {extras = ["email"], version = "*"}
 
 [dev-packages]
 
