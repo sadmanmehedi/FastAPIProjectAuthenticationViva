@@ -18,23 +18,6 @@ client = AsyncIOMotorClient("mongodb+srv://admin:admin@cluster0.lb7qjfv.mongodb.
 # Get a reference to the database
 db = client["Authentication"]
 
-posts=[
-    {
-        "id":1,
-        "title":"penguins",
-        "text":"Penguins are a group of aquatic fligtless birds"
-    },
-    {
-        "id":2,
-        "title":"tigers",
-        "text":"Tigers are the largest living cat species and a members of the genus Panthera"
-    },
-     {
-        "id":3,
-        "title":"Koalas",
-        "text":"Koala is arboreal herbivoures marsupial native to Australia"
-    }
-]
 
 users=[]
 
@@ -45,31 +28,6 @@ app=FastAPI()
 
 def greet():
     return {"Hello":"World!"}
-
-
-#2Get Posts
-@app.get("/posts", tags=["posts"])
-async def get_posts():
-    posts = await db.posts.find().to_list(length=None)
-    return {"data": posts}
-
-
-#3Get single Posts aboout ID
-@app.get("/posts/{id}", tags=["posts"])
-async def get_one_post(id: int):
-    post = await db.posts.find_one({"id": id})
-    if post:
-        return {"data": post}
-    return {"error": "Post with this ID does not exist!"}
-
-#4 Post a blog Post[A handler for creating a Post]
-@app.post("/posts", tags=["posts"])
-async def add_post(post: PostSchema):
-    post_dict = post.dict()
-    post_dict["id"] = len(posts) + 1
-    await db.posts.insert_one(post_dict)
-    return {"info": "Post Added!"}
-  
 
   #5User Signup[Create a new User ]
 @app.post("/user/signup", tags=["user"])
