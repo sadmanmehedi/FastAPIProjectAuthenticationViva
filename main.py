@@ -1,21 +1,16 @@
-import fastapi
-import uvicorn
-from fastapi import FastAPI,Body,Depends
-from app.model import PostSchema
-from app.model import PostSchema,UserLoginSchema,UserSchema
-from app.auth.jwt_handler import signJWT
+import time
+import jwt
+from fastapi import FastAPI, Body, HTTPException
+from app.model import UserSchema, UserLoginSchema
+from app.auth.jwt_handler import signJWT, decodeJWT
 from motor.motor_asyncio import AsyncIOMotorClient
-from fastapi import HTTPException
 
 
-# MongoDB connection settings
-MONGODB_URL = "mongodb+srv://admin:admin@cluster0.lb7qjfv.mongodb.net/Authentication"
+MONGODB_URL = "mongodb+srv://admin:admin@cluster0.nppt6z5.mongodb.net/"
 DATABASE_NAME = "Authentication"
 
-# Create a MongoDB client
-client = AsyncIOMotorClient("mongodb+srv://admin:admin@cluster0.lb7qjfv.mongodb.net/Authentication")
+client = AsyncIOMotorClient(MONGODB_URL +DATABASE_NAME)
 
-# Get a reference to the database
 db = client["Authentication"]
 
 
@@ -23,31 +18,67 @@ users=[]
 
 app=FastAPI()
 
-#1Get for testing
-@app.get("/",tags=["test"])
 
-def greet():
-    return {"Hello":"World!"}
+@app.on_event("startup")
+async def startup_db_client():
+    # Connect to the MongoDB database when the app starts
+    client.get_database()
 
-  #5User Signup[Create a new User ]
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    # Close the MongoDB connection when the app shuts down
+    client.close()
+
 @app.post("/user/signup", tags=["user"])
 async def user_signup(user: UserSchema = Body(default=None)):
     users_collection = db.users
+    print(users_collection)
     existing_user = await users_collection.find_one({"email": user.email})
+    print(existing_user)
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists")
 
     await users_collection.insert_one(user.dict())
-    return signJWT(user.email)
 
-async def check_user(data: UserLoginSchema):
+    # Generate access token and refresh token
+    tokens = signJWT(user.email)
+
+    return tokens
+
+@app.post("/user/refresh", tags=["user"])
+async def refresh_token(refresh_token: str = Body(...)):
+    decoded_refresh_token = decodeJWT(refresh_token)
+
+    if not decoded_refresh_token:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    if decoded_refresh_token["expiry"] < time.time():
+        raise HTTPException(status_code=401, detail="Refresh token has expired")
+
     users_collection = db.users
-    user = await users_collection.find_one({"email": data.email, "password": data.password})
-    return user is not None
+    user = await users_collection.find_one({"email": decoded_refresh_token["userID"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Generate a new access token using the userID from the refresh token
+    new_tokens = signJWT(decoded_refresh_token["userID"])
+
+    # Update the user with the new access token in the database
+    await users_collection.update_one({"email": decoded_refresh_token["userID"]}, {"$set": new_tokens})
+
+    return new_tokens
 
 @app.post("/user/login", tags=["user"])
 async def user_login(user: UserLoginSchema = Body(default=None)):
-    if await check_user(user):
-        return signJWT(user.email)
-    else:
-        return {"error": "Invalid Login Details!"}
+    users_collection = db.users
+    user_data = await users_collection.find_one({"email": user.email, "password": user.password})
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Invalid Login Details")
+
+    # Generate access token and refresh token for the logged-in user
+    tokens = signJWT(user.email)
+
+    # Update the user with the generated tokens in the database
+    await users_collection.update_one({"email": user.email}, {"$set": tokens})
+
+    return tokens

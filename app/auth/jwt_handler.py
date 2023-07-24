@@ -17,12 +17,25 @@ def signJWT(userID:str):
         "userID": userID,
         "expiry":time.time()+600
     }
-    token=jwt.encode(payload,JWT_SECRET,algorithm=JWT_ALGORITHM)
-    return token_response(token)
+    access_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    refresh_payload = {
+        "userID": userID,
+        "expiry": time.time() + 3600  # Set the expiry time for the refresh token (e.g., 1 hour)
+    }
+    refresh_token = jwt.encode(refresh_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    }
+
 
 def decodeJWT(token: str):
     try:
-        decode_token=jwt.decode(token,JWT_SECRET,algorithm=JWT_ALGORITHM)
-        return decode_token if decode_token['expires']>=time.time() else None
-    except:
-        return{}
+        decode_token = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return decode_token if decode_token['expiry'] >= time.time() else None
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
