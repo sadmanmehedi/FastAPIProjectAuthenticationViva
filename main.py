@@ -1,6 +1,6 @@
 import time
 import jwt
-from fastapi import FastAPI, Body, HTTPException
+from fastapi import FastAPI, Body, HTTPException, Depends
 from app.model import UserSchema, UserLoginSchema
 from app.auth.jwt_handler import signJWT, decodeJWT
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -17,6 +17,7 @@ db = client["Authentication"]
 users=[]
 
 app=FastAPI()
+
 
 
 @app.on_event("startup")
@@ -75,10 +76,13 @@ async def user_login(user: UserLoginSchema = Body(default=None)):
     if not user_data:
         raise HTTPException(status_code=401, detail="Invalid Login Details")
 
-    # Generate access token and refresh token for the logged-in user
+    # Generate access token and refresh token for
+    #  the logged-in user
     tokens = signJWT(user.email)
 
     # Update the user with the generated tokens in the database
     await users_collection.update_one({"email": user.email}, {"$set": tokens})
 
     return tokens
+
+
