@@ -4,7 +4,10 @@ from fastapi import FastAPI, Body, HTTPException, Depends
 from app.model import UserSchema, UserLoginSchema
 from app.auth.jwt_handler import signJWT, decodeJWT
 from motor.motor_asyncio import AsyncIOMotorClient
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 
+app=FastAPI()
 
 MONGODB_URL = "mongodb+srv://admin:admin@cluster0.nppt6z5.mongodb.net/"
 DATABASE_NAME = "Authentication"
@@ -13,10 +16,11 @@ client = AsyncIOMotorClient(MONGODB_URL +DATABASE_NAME)
 
 db = client["Authentication"]
 
-
 users=[]
 
-app=FastAPI()
+# OAuth2PasswordBearer security scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
+
 
 
 
@@ -69,7 +73,23 @@ async def refresh_token(refresh_token: str = Body(...)):
 
     return new_tokens
 
-@app.post("/user/login", tags=["user"])
+@app.post("/user/login", tags=["user"],)
+async def user_login(credentials: OAuth2PasswordRequestForm = Depends()):
+    users_collection = db.users
+    user_data = await users_collection.find_one({"email": credentials.username, "password": credentials.password})
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Invalid Login Details")
+
+    # Generate access token and refresh token for
+    #  the logged-in user
+    tokens = signJWT(credentials.username)
+
+    # Update the user with the generated tokens in the database
+    await users_collection.update_one({"email": credentials.username}, {"$set": tokens})
+
+    return tokens
+
+@app.post("/token", tags=["token"])
 async def user_login(user: UserLoginSchema = Body(default=None)):
     users_collection = db.users
     user_data = await users_collection.find_one({"email": user.email, "password": user.password})
@@ -86,3 +106,25 @@ async def user_login(user: UserLoginSchema = Body(default=None)):
     return tokens
 
 
+# Private route that only authenticated users can access
+
+
+# Function to get the current user based on the access token
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    decoded_token = decodeJWT(token)
+    if not decoded_token:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    email = decoded_token["userID"]
+
+    # Replace this with your MongoDB retrieval logic to get the user by email.
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return UserSchema(**user)
+
+
+@app.get("/private_route/")
+async def private_route(current_user: UserSchema = Depends(get_current_user)):
+    return {"message": f"Hello, {current_user.fullname}! This is a private route."}
