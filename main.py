@@ -127,4 +127,5 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
 @app.get("/private_route/")
 async def private_route(current_user: UserSchema = Depends(get_current_user)):
-    return {"message": f"Hello, {current_user.fullname}! This is a private route."}
+    return {"name": current_user.fullname, "email": current_user.email,"password":current_user.password}
+    #return {"message": f"Hello, {current_user.fullname}! This is a private route."}
